@@ -5,6 +5,7 @@ import requests
 import cv2
 import numpy as np
 import edge_tts
+from gtts import gTTS
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, FileResponse
@@ -13,11 +14,12 @@ from moviepy import VideoFileClip, AudioFileClip
 
 app = FastAPI(title="Sanal Drone Istasyonu")
 
+# --- TEK PARÇA WEB ARAYÜZÜ (HTML + CSS + JAVASCRIPT) ---
 HTML_ARAYUZ = """<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>Sanal Drone Operasyon İstasyonu</title>
+  <title>Sanal Drone Uçuş & Video İstasyonu</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #0b1120; color: #f8fafc; padding: 20px; }
@@ -89,7 +91,7 @@ HTML_ARAYUZ = """<!DOCTYPE html>
       
       <div class="form-group">
         <label>Yapay Zeka Erkek Seslendirme Metni (Doğal Türkçe)</label>
-        <textarea id="metin">İzmir'in Selçuk ilçesine bağlı sanayi bölgesinde satılık, iki kat... dükkan artı batarkat imarlı, yüz yirmi altı metrekare arsa alanımız satışa çıkmıştır. Bu arsamızla ilgileniyorsanız, Barça Emlak ile iletişime geçebilirsiniz.</textarea>
+        <textarea id="metin">İzmir'in Selçuk ilçesine bağlı sanayi bölgesinde satılık, iki kat dükkan artı batarkat imarlı, yüz yirmi altı metrekare arsa alanımız satışa çıkmıştır. Bu arsamızla ilgileniyorsanız, Barça Emlak ile iletişime geçebilirsiniz.</textarea>
       </div>
       
       <button class="btn" id="renderBtn" onclick="videoyuUret()">SANAL DRONE UÇUŞUNU VE VİDEOYU OLUŞTUR</button>
@@ -149,7 +151,7 @@ HTML_ARAYUZ = """<!DOCTYPE html>
         }
       } catch (err) {
         durum.innerText = "Sunucu bağlantı hatası.";
-        alert("Sunucuya ulaşılamadı veya zaman aşımı oluştu.");
+        alert("Sunucuya ulaşılamadı veya bağlantı koptu.");
       } finally {
         btn.disabled = false;
       }
@@ -159,6 +161,7 @@ HTML_ARAYUZ = """<!DOCTYPE html>
 </html>
 """
 
+# --- FASTAPI MODELLERİ ---
 class UcusIstegi(BaseModel):
     baslik: str
     adres: str
@@ -174,8 +177,9 @@ def video_getir(dosya_adi: str):
     yol = os.path.join(os.getcwd(), dosya_adi)
     if os.path.exists(yol):
         return FileResponse(yol, media_type="video/mp4")
-    return {"error": "Bulunamadi"}
+    return {"error": "Dosya bulunamadi"}
 
+# --- HARİTA & MATEMATİK FONKSİYONLARI ---
 def lat_lon_to_tile(lat, lon, zoom):
     lat_rad = math.radians(lat)
     n = 2.0 ** zoom
@@ -190,6 +194,7 @@ def lat_lon_to_pixel(lat, lon, zoom, min_xtile, min_ytile):
     y_tile_float = (1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n
     return (x_tile_float - min_xtile) * 256.0, (y_tile_float - min_ytile) * 256.0
 
+# --- API ENDPOINT (RENDER MOTORU) ---
 @app.post("/api/render-drone")
 async def render_drone(req: UcusIstegi):
     try:
@@ -197,14 +202,27 @@ async def render_drone(req: UcusIstegi):
         gecici_video = "gecici_video.mp4"
         son_video = "sanal_drone_cikis.mp4"
 
-        # 1. Seslendirme
-        comm = edge_tts.Communicate(req.metin, voice="tr-TR-AhmetNeural", rate="-5%")
-        await comm.save(ses_dosyasi)
+        # 1. Güvenli Seslendirme (Edge TTS + gTTS Yedek Motoru)
+        temiz_metin = req.metin.replace("...", ",").replace("'", " ").replace('"', ' ').replace("\n", " ").strip()
+        ses_hazir = False
+
+        try:
+            comm = edge_tts.Communicate(temiz_metin, voice="tr-TR-AhmetNeural")
+            await comm.save(ses_dosyasi)
+            if os.path.exists(ses_dosyasi) and os.path.getsize(ses_dosyasi) > 1000:
+                ses_hazir = True
+        except Exception as e:
+            print(f"[!] Edge-TTS baglanti uyarisi: {e}")
+
+        if not ses_hazir:
+            tts = gTTS(text=temiz_metin, lang="tr", slow=False)
+            tts.save(ses_dosyasi)
+
         audio = AudioFileClip(ses_dosyasi)
         ses_suresi = audio.duration + 1.2
         audio.close()
 
-        # 2. Koordinat Düzenleme
+        # 2. Koordinatları Ayrıştırma ve Merkez Noktası
         temiz_koordinatlar = []
         for p in req.koordinatlar:
             lat = float(str(p[0]).replace(',', '.'))
@@ -216,7 +234,7 @@ async def render_drone(req: UcusIstegi):
         merkez_lat = sum(lats) / len(lats)
         merkez_lon = sum(lons) / len(lons)
 
-        # 3. Google Karolarını Çek (5x5)
+        # 3. Google Satellite Katmanını İndirme (5x5 Matris)
         zoom = 18
         xtile, ytile = lat_lon_to_tile(merkez_lat, merkez_lon, zoom)
         min_xtile = xtile - 2
@@ -236,7 +254,7 @@ async def render_drone(req: UcusIstegi):
             satirlar.append(np.hstack(satir))
         harita_img = np.vstack(satirlar)
 
-        # Parseli Çiz
+        # Parsel Çizimi (Kırmızı Şeffaf Dolgu + Sarı Sınır)
         pts = []
         for lat, lon in temiz_koordinatlar:
             px, py = lat_lon_to_pixel(lat, lon, zoom, min_xtile, min_ytile)
@@ -251,12 +269,11 @@ async def render_drone(req: UcusIstegi):
         cv2.addWeighted(overlay, 0.4, harita_img, 0.6, 0, harita_img)
         cv2.polylines(harita_img, [pts_int], isClosed=True, color=(0, 255, 255), thickness=3)
 
-        # 4. Video Render (Linux ve Windows uyumlu)
+        # 4. Sinematik Drone Render (Çapraz Yaklaşma ve Yumuşak Yay)
         target_w, target_h = 1280, 720
         fps = 30
         toplam_kare = int(fps * ses_suresi)
         
-        # mp4v yerine daha güvenli video codec tanımlaması
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(gecici_video, fourcc, fps, (target_w, target_h))
 
@@ -275,14 +292,15 @@ async def render_drone(req: UcusIstegi):
 
             kare = cv2.warpAffine(harita_img, M, (target_w, target_h), flags=cv2.INTER_LANCZOS4, borderMode=cv2.BORDER_REFLECT_101)
 
-            # HUD
+            # Telemetri HUD
             cv2.rectangle(kare, (25, 25), (640, 160), (10, 10, 10), -1)
             cv2.rectangle(kare, (25, 25), (640, 160), (0, 255, 0), 1)
             cv2.putText(kare, req.baslik[:45], (40, 52), cv2.FONT_HERSHEY_DUPLEX, 0.55, (0, 255, 0), 1)
             cv2.putText(kare, f"ADRES: {req.adres[:45]}", (40, 78), cv2.FONT_HERSHEY_DUPLEX, 0.45, (255, 255, 255), 1)
             cv2.putText(kare, f"HEDEF: {merkez_lat:.5f} N, {merkez_lon:.5f} E", (40, 104), cv2.FONT_HERSHEY_DUPLEX, 0.45, (255, 255, 255), 1)
-            cv2.putText(kare, f"IRTIFA: {int(320 - smooth_t * 220)}m | SES: AHMET NEURAL", (40, 130), cv2.FONT_HERSHEY_DUPLEX, 0.42, (0, 255, 0), 1)
+            cv2.putText(kare, f"IRTIFA: {int(320 - smooth_t * 220)}m | SES: AKTIF", (40, 130), cv2.FONT_HERSHEY_DUPLEX, 0.42, (0, 255, 0), 1)
 
+            # Nişangah
             cx, cy = target_w // 2, target_h // 2
             cv2.drawMarker(kare, (cx, cy), (0, 255, 0), markerType=cv2.MARKER_CROSS, markerSize=20, thickness=1)
             cv2.circle(kare, (cx, cy), 35, (0, 255, 0), 1)
@@ -290,9 +308,10 @@ async def render_drone(req: UcusIstegi):
             
         out.release()
 
-        # 5. Sesi Göm
+        # 5. Ses ve Videoyu Birleştirme
         video_clip = VideoFileClip(gecici_video)
         audio_clip = AudioFileClip(ses_dosyasi)
+        
         if hasattr(video_clip, "with_audio"):
             son_klip = video_clip.with_audio(audio_clip)
         else:
