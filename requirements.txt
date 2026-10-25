@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pydantic
+requests
+opencv-python-headless
+numpy
+edge-tts
+moviepy

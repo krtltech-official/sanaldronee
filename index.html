@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sanal Drone Uçuş & Video İstasyonu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+        }
+        /* Resimdeki TKGM sekme ve tablo tasarımı */
+        .tkgm-tab-active {
+            border-bottom: 2px solid #2563eb;
+            color: #1e40af;
+            font-weight: 600;
+        }
+        .tkgm-table th, .tkgm-table td {
+            border: 1px solid #e5e7eb;
+            padding: 10px 14px;
+            text-align: center;
+        }
+        .tkgm-table input {
+            width: 100%;
+            text-align: center;
+            outline: none;
+            background: transparent;
+            font-weight: 500;
+            color: #111827;
+        }
+        .tkgm-table input:focus {
+            background-color: #eff6ff;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Üst Başlık -->
+        <header class="flex flex-col md:flex-row items-center justify-between bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
+            <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-600 to-emerald-500 flex items-center justify-center text-white text-2xl shadow-lg">
+                    <i class="fa-solid fa-crosshairs"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                        SANAL DRONE İSTASYONU
+                        <span class="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">Canlı Google Uydu</span>
+                    </h1>
+                    <p class="text-sm text-slate-400">Gerçek Parsel Koordinatları & AI Erkek Seslendirmeli Tanıtım Robotu</p>
+                </div>
+            </div>
+            <div class="mt-4 md:mt-0 flex items-center gap-3">
+                <span class="text-xs text-slate-400 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+                    <i class="fa-solid fa-microphone text-blue-400 mr-1"></i> Ses Motoru: <strong>Ahmet Neural</strong>
+                </span>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- Sol Panel: Koordinat Tablosu ve Adres Bilgileri -->
+            <div class="lg:col-span-6 space-y-6">
+
+                <!-- 1. Google Haritalar Full Adres ve Başlık -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-4">
+                    <h2 class="text-base font-semibold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+                        <i class="fa-solid fa-map-location-dot text-blue-500"></i> Google Haritalar Adresi & Başlık
+                    </h2>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Firma / İlan Başlığı</label>
+                        <input type="text" id="ilanBaslik" value="BARÇA EMLAK // SANAYİ BÖLGESİ SATILIK" 
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-blue-500 outline-none transition">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Google Haritalar Tam Açık Adres</label>
+                        <div class="relative">
+                            <input type="text" id="fullAdres" value="Cumhuriyet, 5001. Sk. No:53, 35925 Selçuk/İzmir" 
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:border-blue-500 outline-none transition">
+                            <i class="fa-solid fa-location-dot absolute left-3.5 top-3.5 text-slate-500"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. RESİMDEKİ BİREBİR TKGM KOORDİNAT LİSTESİ DÜZENİ -->
+                <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200 text-gray-900">
+                    <!-- Üst Tab Bar (Resimdeki düzen) -->
+                    <div class="flex border-b border-gray-200 bg-gray-50 text-sm">
+                        <button class="px-6 py-3 font-semibold text-blue-600 border-b-2 border-blue-600 bg-white">
+                            Koordinat Listesi
+                        </button>
+                        <button class="px-6 py-3 text-gray-500 hover:text-gray-700">
+                            Kenar Uzunlukları
+                        </button>
+                        <div class="ml-auto flex items-center pr-4">
+                            <span class="text-xs text-gray-400 bg-gray-200 px-2.5 py-1 rounded-full font-mono">1. - 5. Nokta</span>
+                        </div>
+                    </div>
+
+                    <!-- Koordinat Tablosu (Resimdeki Tasarım) -->
+                    <div class="p-4">
+                        <table class="w-full tkgm-table border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50 text-gray-700 text-sm font-semibold">
+                                    <th class="w-16">No</th>
+                                    <th>Enlem</th>
+                                    <th>Boylam</th>
+                                </tr>
+                            </thead>
+                            <tbody id="coordTableBody" class="text-sm font-mono divide-y divide-gray-200">
+                                <tr>
+                                    <td class="font-bold text-gray-600 bg-gray-50">1</td>
+                                    <td><input type="number" step="0.000001" value="37.9390" class="lat-input"></td>
+                                    <td><input type="number" step="0.000001" value="27.3663" class="lon-input"></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-bold text-gray-600 bg-gray-50">2</td>
+                                    <td><input type="number" step="0.000001" value="37.9389" class="lat-input"></td>
+                                    <td><input type="number" step="0.000001" value="27.3663" class="lon-input"></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-bold text-gray-600 bg-gray-50">3</td>
+                                    <td><input type="number" step="0.000001" value="37.9389" class="lat-input"></td>
+                                    <td><input type="number" step="0.000001" value="27.3664" class="lon-input"></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-bold text-gray-600 bg-gray-50">4</td>
+                                    <td><input type="number" step="0.000001" value="37.9390" class="lat-input"></td>
+                                    <td><input type="number" step="0.000001" value="27.3664" class="lon-input"></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-bold text-gray-600 bg-gray-50">5</td>
+                                    <td><input type="number" step="0.000001" value="37.9390" class="lat-input"></td>
+                                    <td><input type="number" step="0.000001" value="27.3663" class="lon-input"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p class="text-xs text-gray-500 mt-2 text-center">
+                            * Hücrelere tıklayıp yeni enlem/boylam değerlerini doğrudan değiştirebilirsin.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 3. Erkek Seslendirme Metni Düzenleme -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-3">
+                    <label class="block text-xs font-semibold text-slate-300 flex items-center justify-between">
+                        <span><i class="fa-solid fa-volume-high text-emerald-400 mr-1.5"></i> Yapay Zeka Erkek Seslendirme Metni</span>
+                        <span class="text-xs text-slate-500 font-normal">Doğal Duraklamalı Türkçe</span>
+                    </label>
+                    <textarea id="sesMetni" rows="3" 
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-200 focus:border-blue-500 outline-none leading-relaxed transition">İzmir'in Selçuk ilçesine bağlı sanayi bölgesinde satılık, iki kat... dükkan artı batarkat imarlı, yüz yirmi altı metrekare arsa alanımız satışa çıkmıştır. Bu arsamızla ilgileniyorsanız, Barça Emlak ile iletişime geçebilirsiniz.</textarea>
+                </div>
+
+                <!-- Başlat Butonu -->
+                <button id="renderBtn" onclick="renderDroneVideo()" 
+                    class="w-full bg-gradient-to-r from-blue-600 hover:from-blue-500 to-emerald-600 hover:to-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-900/30 flex items-center justify-center gap-3 transition transform active:scale-[0.99]">
+                    <i class="fa-solid fa-video text-xl"></i>
+                    <span>SANAL DRONE UÇUŞUNU VE VİDEOYU OLUŞTUR</span>
+                </button>
+
+            </div>
+
+            <!-- Sağ Panel: Canlı Drone Ekranı ve Video Oynatıcı -->
+            <div class="lg:col-span-6 space-y-6">
+
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col h-full">
+                    <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                        <h2 class="text-base font-semibold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-satellite-dish text-emerald-400"></i> Drone Kamera Çıktısı (1080p / 30 FPS)
+                        </h2>
+                        <span id="durumBadge" class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full border border-slate-700">
+                            Hazır
+                        </span>
+                    </div>
+
+                    <!-- Video / Placeholder Alanı -->
+                    <div class="relative flex-1 min-h-[380px] bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-center overflow-hidden">
+                        
+                        <!-- Yükleme Animasyonu -->
+                        <div id="loadingOverlay" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6 text-center space-y-4">
+                            <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            <div>
+                                <h3 class="text-base font-bold text-white">Sanal Drone Göreve Başladı</h3>
+                                <p id="yuklemeDetay" class="text-xs text-slate-400 mt-1">Google Haritalar karoları birleştiriliyor ve ses sentezleniyor...</p>
+                            </div>
+                        </div>
+
+                        <!-- Video Oynatıcı -->
+                        <video id="droneVideoPlayer" controls class="hidden w-full h-full object-contain rounded-xl"></video>
+
+                        <!-- Başlangıç Placeholder -->
+                        <div id="videoPlaceholder" class="text-center p-8 space-y-4">
+                            <div class="w-20 h-20 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-500 text-3xl">
+                                <i class="fa-solid fa-play"></i>
+                            </div>
+                            <div class="max-w-xs mx-auto">
+                                <h3 class="text-sm font-semibold text-slate-300">Henüz Video Üretilmedi</h3>
+                                <p class="text-xs text-slate-500 mt-1">Koordinatları ve Google Haritalar adresini kontrol edip butona basarak videoyu oluşturabilirsin.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- İndirme ve Paylaşma Butonları -->
+                    <div id="videoActions" class="hidden mt-4 pt-4 border-t border-slate-800 flex items-center justify-between">
+                        <a id="downloadBtn" href="#" download="parsel_drone_video.mp4" 
+                            class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg border border-slate-700 flex items-center gap-2 transition">
+                            <i class="fa-solid fa-download"></i> Videoyu Bilgisayara İndir (MP4)
+                        </a>
+                        <span class="text-xs text-emerald-400 font-mono flex items-center gap-1.5">
+                            <i class="fa-solid fa-circle-check"></i> Render Başarılı
+                        </span>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        async function renderDroneVideo() {
+            const btn = document.getElementById("renderBtn");
+            const loadingOverlay = document.getElementById("loadingOverlay");
+            const videoPlaceholder = document.getElementById("videoPlaceholder");
+            const player = document.getElementById("droneVideoPlayer");
+            const actions = document.getElementById("videoActions");
+            const downloadBtn = document.getElementById("downloadBtn");
+            const durumBadge = document.getElementById("durumBadge");
+
+            // Koordinat tablosunu oku
+            const rows = document.querySelectorAll("#coordTableBody tr");
+            const coordinates = [];
+
+            rows.forEach((row, index) => {
+                const lat = parseFloat(row.querySelector(".lat-input").value);
+                const lon = parseFloat(row.querySelector(".lon-input").value);
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    coordinates.push({ no: index + 1, lat: lat, lon: lon });
+                }
+            });
+
+            if (coordinates.length < 3) {
+                alert("Lütfen en az 3 geçerli koordinat giriniz!");
+                return;
+            }
+
+            const payload = {
+                title: document.getElementById("ilanBaslik").value.trim(),
+                full_address: document.getElementById("fullAdres").value.trim(),
+                voice_text: document.getElementById("sesMetni").value.trim(),
+                coordinates: coordinates
+            };
+
+            // UI Durumu: Yükleniyor
+            btn.disabled = true;
+            btn.classList.add("opacity-50", "cursor-not-allowed");
+            loadingOverlay.classList.remove("hidden");
+            durumBadge.innerText = "İşleniyor...";
+            durumBadge.className = "text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full border border-amber-500/30";
+
+            try {
+                const resp = await fetch("/api/render-drone", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!resp.ok) {
+                    throw new Error("Render işlemi sırasında hata oluştu!");
+                }
+
+                const result = await resp.json();
+
+                // Videoyu Oynat
+                videoPlaceholder.classList.add("hidden");
+                player.classList.remove("hidden");
+                player.src = result.video_url;
+                player.load();
+                player.play();
+
+                downloadBtn.href = result.video_url;
+                actions.classList.remove("hidden");
+
+                durumBadge.innerText = "Tamamlandı";
+                durumBadge.className = "text-xs bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30";
+
+            } catch (err) {
+                alert("Hata: " + err.message);
+                durumBadge.innerText = "Hata Oluştu";
+                durumBadge.className = "text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded-full border border-red-500/30";
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove("opacity-50", "cursor-not-allowed");
+                loadingOverlay.classList.add("hidden");
+            }
+        }
+    </script>
+</body>
+</html>
