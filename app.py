@@ -15,7 +15,7 @@ from moviepy import VideoFileClip, AudioFileClip
 
 app = FastAPI(title="Sanal Drone Istasyonu")
 
-# --- HTML / CSS / JS ARAYÜZÜ ---
+# --- HTML / CSS / JS ARAYÜZÜ (DİNAMİK 9+ KOORDİNAT DESTEKLİ) ---
 HTML_ARAYUZ = """<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -32,14 +32,21 @@ HTML_ARAYUZ = """<!DOCTYPE html>
     input[type="text"], textarea { width: 100%; padding: 10px 12px; background-color: #0b1120; border: 1px solid #334155; border-radius: 6px; color: #f8fafc; font-size: 0.88rem; }
     textarea { resize: vertical; height: 75px; }
     
-    .tkgm-box { background: #ffffff; border-radius: 6px; overflow: hidden; margin-bottom: 14px; border: 1px solid #cbd5e1; }
-    .tkgm-tabs { display: flex; background: #f8fafc; border-bottom: 1px solid #cbd5e1; }
+    .tkgm-box { background: #ffffff; border-radius: 6px; overflow: hidden; margin-bottom: 10px; border: 1px solid #cbd5e1; max-height: 320px; overflow-y: auto; }
+    .tkgm-tabs { display: flex; background: #f8fafc; border-bottom: 1px solid #cbd5e1; position: sticky; top: 0; z-index: 2; }
     .tkgm-tab { padding: 8px 16px; font-size: 0.82rem; font-weight: bold; color: #334155; border-right: 1px solid #cbd5e1; background: #ffffff; }
     .tkgm-tab.inactive { background: #f1f5f9; color: #0284c7; font-weight: normal; }
     table { width: 100%; border-collapse: collapse; }
-    th { background: #ffffff; color: #1e293b; font-size: 0.8rem; font-weight: 600; padding: 8px; border: 1px solid #e2e8f0; text-align: center; }
+    th { background: #ffffff; color: #1e293b; font-size: 0.8rem; font-weight: 600; padding: 8px; border: 1px solid #e2e8f0; text-align: center; position: sticky; top: 33px; z-index: 1; }
     td { padding: 4px; border: 1px solid #e2e8f0; text-align: center; }
     td input { width: 92%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; text-align: center; font-size: 0.85rem; color: #0f172a; font-weight: 500; background: #f8fafc; }
+    
+    .table-actions { display: flex; gap: 8px; margin-bottom: 14px; }
+    .btn-action { flex: 1; padding: 8px; font-size: 0.8rem; font-weight: 600; border: none; border-radius: 5px; cursor: pointer; transition: 0.2s; }
+    .btn-add { background: #10b981; color: white; }
+    .btn-add:hover { background: #059669; }
+    .btn-remove { background: #ef4444; color: white; }
+    .btn-remove:hover { background: #dc2626; }
     
     .btn { width: 100%; background: #0284c7; color: white; border: none; padding: 13px; font-size: 0.95rem; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.2s; }
     .btn:hover { background: #0369a1; }
@@ -64,13 +71,13 @@ HTML_ARAYUZ = """<!DOCTYPE html>
       </div>
       
       <div class="form-group">
-        <label>TKGM Parsel Koordinat Listesi</label>
+        <label>TKGM Parsel Koordinat Listesi (Dinamik)</label>
         <div class="tkgm-box">
           <div class="tkgm-tabs">
             <div class="tkgm-tab">Koordinat Listesi</div>
             <div class="tkgm-tab inactive">Kenar Uzunlukları</div>
           </div>
-          <table>
+          <table id="koordinatTablosu">
             <thead>
               <tr>
                 <th style="width: 14%;">No</th>
@@ -78,19 +85,23 @@ HTML_ARAYUZ = """<!DOCTYPE html>
                 <th style="width: 43%;">Boylam</th>
               </tr>
             </thead>
-            <tbody>
-              <tr><td>1</td><td><input type="text" id="lat1" value="37.9390"></td><td><input type="text" id="lon1" value="27.3663"></td></tr>
-              <tr><td>2</td><td><input type="text" id="lat2" value="37.9389"></td><td><input type="text" id="lon2" value="27.3663"></td></tr>
-              <tr><td>3</td><td><input type="text" id="lat3" value="37.9389"></td><td><input type="text" id="lon3" value="27.3664"></td></tr>
-              <tr><td>4</td><td><input type="text" id="lat4" value="37.9390"></td><td><input type="text" id="lon4" value="27.3664"></td></tr>
-              <tr><td>5</td><td><input type="text" id="lat5" value="37.9390"></td><td><input type="text" id="lon5" value="27.3663"></td></tr>
+            <tbody id="tabloGövde">
+              <tr><td>1</td><td><input type="text" class="lat" value="37.9390"></td><td><input type="text" class="lon" value="27.3663"></td></tr>
+              <tr><td>2</td><td><input type="text" class="lat" value="37.9389"></td><td><input type="text" class="lon" value="27.3663"></td></tr>
+              <tr><td>3</td><td><input type="text" class="lat" value="37.9389"></td><td><input type="text" class="lon" value="27.3664"></td></tr>
+              <tr><td>4</td><td><input type="text" class="lat" value="37.9390"></td><td><input type="text" class="lon" value="27.3664"></td></tr>
+              <tr><td>5</td><td><input type="text" class="lat" value="37.9390"></td><td><input type="text" class="lon" value="27.3663"></td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="table-actions">
+          <button type="button" class="btn-action btn-add" onclick="satirEkle()">+ Koordinat Ekle (Satır Ekle)</button>
+          <button type="button" class="btn-action btn-remove" onclick="satirSil()">- Son Satırı Sil</button>
         </div>
       </div>
       
       <div class="form-group">
-        <label>Yapay Zeka Erkek Seslendirme Metni (Doğal Türkçe)</label>
+        <label>Yapay Zeka Erkek Seslendirme Metni</label>
         <textarea id="metin">İzmir'in Selçuk ilçesine bağlı sanayi bölgesinde satılık, iki kat dükkan artı batarkat imarlı, yüz yirmi altı metrekare arsa alanımız satışa çıkmıştır. Bu arsamızla ilgileniyorsanız, Barça Emlak ile iletişime geçebilirsiniz.</textarea>
       </div>
       
@@ -112,26 +123,54 @@ HTML_ARAYUZ = """<!DOCTYPE html>
       return parseFloat(val.toString().replace(',', '.').trim());
     }
 
+    function satirEkle() {
+      const tbody = document.getElementById("tabloGövde");
+      const sira = tbody.children.length + 1;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${sira}</td><td><input type="text" class="lat" placeholder="Enlem"></td><td><input type="text" class="lon" placeholder="Boylam"></td>`;
+      tbody.appendChild(tr);
+    }
+
+    function satirSil() {
+      const tbody = document.getElementById("tabloGövde");
+      if (tbody.children.length > 3) {
+        tbody.removeChild(tbody.lastElementChild);
+      } else {
+        alert("En az 3 koordinat olmalıdır!");
+      }
+    }
+
     async function videoyuUret() {
       const btn = document.getElementById("renderBtn");
       const durum = document.getElementById("durum");
       const videoKutusu = document.getElementById("videoKutusu");
       
+      const latInputs = document.querySelectorAll(".lat");
+      const lonInputs = document.querySelectorAll(".lon");
+      
+      const koordinatlar = [];
+      for (let i = 0; i < latInputs.length; i++) {
+        const latVal = temizleSayi(latInputs[i].value);
+        const lonVal = temizleSayi(lonInputs[i].value);
+        if (latVal && lonVal) {
+          koordinatlar.push([latVal, lonVal]);
+        }
+      }
+
+      if (koordinatlar.length < 3) {
+        alert("Lütfen en az 3 geçerli koordinat girin!");
+        return;
+      }
+      
       const payload = {
         baslik: document.getElementById("baslik").value,
         adres: document.getElementById("adres").value,
         metin: document.getElementById("metin").value,
-        koordinatlar: [
-          [temizleSayi(document.getElementById("lat1").value), temizleSayi(document.getElementById("lon1").value)],
-          [temizleSayi(document.getElementById("lat2").value), temizleSayi(document.getElementById("lon2").value)],
-          [temizleSayi(document.getElementById("lat3").value), temizleSayi(document.getElementById("lon3").value)],
-          [temizleSayi(document.getElementById("lat4").value), temizleSayi(document.getElementById("lon4").value)],
-          [temizleSayi(document.getElementById("lat5").value), temizleSayi(document.getElementById("lon5").value)]
-        ]
+        koordinatlar: koordinatlar
       };
       
       btn.disabled = true;
-      durum.innerText = "⏳ Uydu karoları çekiliyor, ses sentezleniyor ve drone kurgulanıyor...";
+      durum.innerText = "⏳ " + koordinatlar.length + " köşe noktası taranıyor, ses sentezleniyor ve video üretiliyor...";
       videoKutusu.innerHTML = '<span style="color: #38bdf8; font-size: 0.9rem;">Sanal Drone Uçuşu İşleniyor...</span>';
       
       try {
@@ -194,7 +233,7 @@ def lat_lon_to_pixel(lat, lon, zoom, min_xtile, min_ytile):
     y_tile_float = (1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n
     return (x_tile_float - min_xtile) * 256.0, (y_tile_float - min_ytile) * 256.0
 
-# --- API ENDPOINT (SES + HARİTA + VİDEO MOTORU) ---
+# --- API ENDPOINT (SES + HARİTA + DİNAMİK POLİGON MOTORU) ---
 @app.post("/api/render-drone")
 async def render_drone(req: UcusIstegi):
     try:
@@ -222,7 +261,7 @@ async def render_drone(req: UcusIstegi):
         ses_suresi = audio.duration + 1.0
         audio.close()
 
-        # 2. Koordinatları Çözümleme
+        # 2. Kaç Köşe Gelirse Gelsin (9, 10, vb.) Çözümleme
         temiz_koordinatlar = []
         for p in req.koordinatlar:
             lat = float(str(p[0]).replace(',', '.'))
@@ -254,7 +293,7 @@ async def render_drone(req: UcusIstegi):
             satirlar.append(np.hstack(satir))
         harita_img = np.vstack(satirlar)
 
-        # Parseli Haritaya Çiz
+        # Dinamik Poligon Çizimi
         pts = []
         for lat, lon in temiz_koordinatlar:
             px, py = lat_lon_to_pixel(lat, lon, zoom, min_xtile, min_ytile)
@@ -267,9 +306,9 @@ async def render_drone(req: UcusIstegi):
         overlay = harita_img.copy()
         cv2.fillPoly(overlay, [pts_int], (0, 0, 255))
         cv2.addWeighted(overlay, 0.4, harita_img, 0.6, 0, harita_img)
-        cv2.polylines(harita_img, [pts_int], isClosed=True, color=(0, 255, 255), thickness=3)
+        cv2.polylines(harita_img, [pts_int], isClosed=True, color=(0, 255, 255), thickness=2)
 
-        # 4. Drone Uçuş Render (RAM Dostu 854x480 / 24 FPS)
+        # 4. Drone Uçuş Render (854x480 / 24 FPS)
         target_w, target_h = 854, 480
         fps = 24
         toplam_kare = int(fps * ses_suresi)
@@ -297,7 +336,7 @@ async def render_drone(req: UcusIstegi):
             cv2.rectangle(kare, (15, 15), (480, 115), (0, 255, 0), 1)
             cv2.putText(kare, req.baslik[:38], (25, 38), cv2.FONT_HERSHEY_DUPLEX, 0.45, (0, 255, 0), 1)
             cv2.putText(kare, f"ADRES: {req.adres[:38]}", (25, 60), cv2.FONT_HERSHEY_DUPLEX, 0.38, (255, 255, 255), 1)
-            cv2.putText(kare, f"HEDEF: {merkez_lat:.5f} N, {merkez_lon:.5f} E", (25, 82), cv2.FONT_HERSHEY_DUPLEX, 0.38, (255, 255, 255), 1)
+            cv2.putText(kare, f"HEDEF: {merkez_lat:.5f} N, {merkez_lon:.5f} E ({len(temiz_koordinatlar)} KOSE)", (25, 82), cv2.FONT_HERSHEY_DUPLEX, 0.38, (255, 255, 255), 1)
             cv2.putText(kare, f"IRTIFA: {int(320 - smooth_t * 220)}m | BARCA EMLAK", (25, 102), cv2.FONT_HERSHEY_DUPLEX, 0.35, (0, 255, 0), 1)
 
             cx, cy = target_w // 2, target_h // 2
